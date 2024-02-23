@@ -20,29 +20,27 @@ public class ShortenURLService implements IShortenURLService {
 
     private final IEventPublisher eventPublisher;
 
-    public ShortenURLService(URLShortenerConfiguration configuration, IShortURLGenerator generator, IShortenedURLRepository repository, IEventPublisher publisher) {
+    public ShortenURLService(URLShortenerConfiguration configuration, IShortURLGenerator generator,
+                             IShortenedURLRepository repository, IEventPublisher publisher) {
         this.configuration = configuration;
         this.generator = generator;
         this.repository = repository;
         this.eventPublisher = publisher;
     }
 
-    private ShortenedURLEntity generateShortenedURL(String originalURL) {
+    private Optional<ShortenedURLEntity> generateShortenedURL(String originalURL, int attempt) {
 
         ShortenedURLEntity entity;
 
-        int attempts = 0;
+        String shortenedURL = attempt == 0 ? generator.generateShortURL(originalURL) : generator.reGenShortURL(originalURL, attempt);
 
-        do {
-            String shortenedURL = attempts == 0 ? generator.generateShortURL(originalURL) : generator.reGenShortURL(originalURL, attempts);
+        entity = new ShortenedURLEntity(originalURL, shortenedURL, ZonedDateTime.now());
 
-            attempts++;
+        if (repository.insertNew(entity)) {
+            return Optional.of(entity);
+        }
 
-            entity = new ShortenedURLEntity(originalURL, shortenedURL, ZonedDateTime.now());
-
-        } while (repository.save(entity) == null);
-
-        return entity;
+        return Optional.empty();
     }
 
     private void assertMatchesConfiguration(String shortURL) throws IllegalArgumentException {
@@ -57,11 +55,36 @@ public class ShortenURLService implements IShortenURLService {
 
     }
 
+    private static final int MAX_ATTEMPTS = 10;
+
     @Override
-    public ShortenedURLEntity shortenURL(String originalURL) {
-        // If we already have a shortened URL for the original URL, return it
-        ShortenedURLEntity shortenedURLEntity = repository.findByOriginalURL(originalURL)
-                .orElseGet(() -> generateShortenedURL(originalURL));
+    public ShortenedURLEntity shortenURL(String originalURL) throws IllegalArgumentException {
+
+        int attempt = 0;
+
+        ShortenedURLEntity shortenedURLEntity;
+
+        while (true) {
+
+            if (attempt > MAX_ATTEMPTS) {
+                throw new IllegalArgumentException("Cannot shorten URL");
+            }
+
+            Optional<ShortenedURLEntity> byFullLengthURL = repository.findByOriginalURL(originalURL);
+
+            if (byFullLengthURL.isPresent()) {
+                shortenedURLEntity = byFullLengthURL.get();
+
+                break;
+            }
+
+            Optional<ShortenedURLEntity> shortenedURL = generateShortenedURL(originalURL, attempt++);
+
+            if (shortenedURL.isPresent()) {
+                shortenedURLEntity = shortenedURL.get();
+                break;
+            }
+        }
 
         eventPublisher.publish(new ShortURLLookupEvent(shortenedURLEntity.shortenedURL(), shortenedURLEntity.originalURL(), ZonedDateTime.now()));
 
