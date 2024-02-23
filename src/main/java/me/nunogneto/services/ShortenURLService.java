@@ -2,6 +2,7 @@ package me.nunogneto.services;
 
 import me.nunogneto.configuration.URLShortenerConfiguration;
 import me.nunogneto.events.IEventPublisher;
+import me.nunogneto.events.ShortURLLookupEvent;
 import me.nunogneto.models.ShortenedURLEntity;
 import me.nunogneto.models.shorteners.IShortURLGenerator;
 import me.nunogneto.repositories.IShortenedURLRepository;
@@ -29,7 +30,9 @@ public class ShortenURLService implements IShortenURLService {
     private ShortenedURLEntity generateShortenedURL(String originalURL) {
 
         ShortenedURLEntity entity;
+
         int attempts = 0;
+
         do {
             String shortenedURL = attempts == 0 ? generator.generateShortURL(originalURL) : generator.reGenShortURL(originalURL, attempts);
 
@@ -57,17 +60,24 @@ public class ShortenURLService implements IShortenURLService {
     @Override
     public ShortenedURLEntity shortenURL(String originalURL) {
         // If we already have a shortened URL for the original URL, return it
-        return repository.findByOriginalURL(originalURL)
+        ShortenedURLEntity shortenedURLEntity = repository.findByOriginalURL(originalURL)
                 .orElseGet(() -> generateShortenedURL(originalURL));
+
+        eventPublisher.publish(new ShortURLLookupEvent(shortenedURLEntity.shortenedURL(), shortenedURLEntity.originalURL(), ZonedDateTime.now()));
+
+        return shortenedURLEntity;
     }
 
     @Override
     public Optional<ShortenedURLEntity> findByShortenedURL(String shortenedURL) {
-
         // Assert we are being passed a valid shortened URL
         assertMatchesConfiguration(shortenedURL);
 
-        return repository.findById(shortenedURL);
+        Optional<ShortenedURLEntity> shortURL = repository.findById(shortenedURL);
+
+        shortURL.ifPresent(shortenedURLEntity -> eventPublisher.publish(new ShortURLLookupEvent(shortenedURL, shortenedURLEntity.originalURL(), ZonedDateTime.now())));
+
+        return shortURL;
     }
 
 }

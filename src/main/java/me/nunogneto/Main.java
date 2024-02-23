@@ -22,12 +22,7 @@ public class Main {
 
         IShortURLGenerator generator = new HashBasedShortener(config);
 
-        IShortenURLService service = new ShortenURLService(config, generator, repository, new IEventPublisher() {
-            @Override
-            public void publish(Object event) {
-
-            }
-        });
+        IShortenURLService service = new ShortenURLService(config, generator, repository, event -> {});
 
         new URLShortenerController(service);
 
