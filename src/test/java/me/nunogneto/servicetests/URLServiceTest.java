@@ -72,7 +72,6 @@ public class URLServiceTest {
 
     @Test
     public void testValidPresentURL() {
-
         ShortenedURLEntity shortenedURL = new ShortenedURLEntity("http://www.google.com", "1234567", ZonedDateTime.now());
 
         Mockito.when(repository.findById("1234567")).thenReturn(Optional.of(shortenedURL));
