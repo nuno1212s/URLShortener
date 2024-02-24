@@ -84,6 +84,15 @@ public class MongoRepository implements IShortenedURLRepository {
 
     @Override
     public boolean insertNew(ShortenedURLEntity entity) {
-        return false;
+
+        MShortenedURLEntity mShortenedURLEntity = new MShortenedURLEntity(entity.originalURL(), entity.shortenedURL(), entity.createdAt());
+
+        try {
+            this.datastore.insert(mShortenedURLEntity);
+        } catch (Exception e) {
+            return false;
+        }
+
+        return true;
     }
 }

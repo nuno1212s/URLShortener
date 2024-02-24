@@ -8,7 +8,6 @@ public interface IShortenedURLRepository extends IRepository<ShortenedURLEntity,
 
     Optional<ShortenedURLEntity> findByOriginalURL(String originalURL);
 
-
     boolean insertNew(ShortenedURLEntity entity);
 
 }
